@@ -1,0 +1,28 @@
+[Unit]
+Description=WHM MailGuard - Brute Force Protection
+Documentation=https://github.com/tu-usuario/whm-mailguard
+After=network.target exim.service dovecot.service
+Wants=exim.service dovecot.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/usr/local/mailguard
+ExecStart=/usr/bin/python3 /usr/local/mailguard/backend/mailguard.py
+ExecStop=/bin/kill -TERM $MAINPID
+
+# Reinicio automático si falla
+Restart=on-failure
+RestartSec=10s
+
+# Límites de seguridad
+TimeoutStartSec=30
+TimeoutStopSec=30
+
+# Logging hacia systemd journal
+StandardOutput=append:/var/log/mailguard.log
+StandardError=append:/var/log/mailguard.log
+
+[Install]
+WantedBy=multi-user.target

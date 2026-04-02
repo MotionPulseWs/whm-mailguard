@@ -1,0 +1,107 @@
+================================================================================
+                   DOCUMENTACIÓN DEL PROYECTO: WHM-MAILGUARD
+================================================================================
+
+NOMBRE DEL PROYECTO:
+    WHM-Mailguard - Plugin de Protección de Correo para WHM
+
+DESCRIPCIÓN:
+    Este proyecto es un plugin para Web Host Manager (WHM) que proporciona
+    funcionalidades de protección y gestión de correos electrónicos.
+
+================================================================================
+ESTRUCTURA DEL PROYECTO:
+================================================================================
+
+ROOT: e:/2026 WEB/Proyectos JSX/whm-mailguard/
+│
+├── install.sh                    # Script de instalación del plugin
+├── uninstall.sh                  # Script de desinstalación del plugin
+├── README.md                     # Documentación principal (vacío)
+│
+├── backend/                      # Componente backend - Lógica principal
+│   ├── mailguard.py             # Código principal Python del servicio
+│   ├── mailguard.service        # Servicios systemd para ejecutar mailguard
+│   └── db/
+│       └── schema.sql           # Esquema de base de datos SQL
+│
+├── whm-plugin/                  # Componente frontend - Plugin WHM
+│   ├── mailguard.cgi            # Script CGI para interfaz web
+│   └── mailguard.conf           # Archivo de configuración del plugin
+│
+└── docs/                        # Documentación del proyecto
+    └── screenshots/             # Capturas de pantalla de la interfaz
+
+
+================================================================================
+COMPONENTES PRINCIPALES:
+================================================================================
+
+1. FRONTEND (whm-plugin/)
+   - mailguard.cgi: Interfaz web accesible desde el panel de control WHM
+   - mailguard.conf: Configuración específica del plugin
+
+2. BACKEND (backend/)
+   - mailguard.py: Servicio principal que ejecuta la lógica de protección
+   - mailguard.service: Permite que el servicio se inicie automáticamente
+   - schema.sql: Define la estructura de almacenamiento de datos
+
+3. INSTALACIÓN (scripts)
+   - install.sh: Automatiza la instalación del plugin en WHM
+   - uninstall.sh: Automatiza la desinstalación del plugin
+
+
+================================================================================
+TECNOLOGÍAS UTILIZADAS:
+================================================================================
+
+Backend:
+    - Python (mailguard.py)
+    - SQL (para base de datos)
+    - Systemd (para gestión de servicios en Linux)
+
+Frontend:
+    - CGI Script (para interfaz web en WHM)
+    - Bash (install/uninstall scripts)
+
+Sistema Operativo Objetivo:
+    - Linux (basado en la presencia de .service y .sh)
+
+
+================================================================================
+ARCHIVOS CLAVE:
+================================================================================
+
+install.sh                  -> Punto de entrada principal para la instalación
+backend/mailguard.py        -> Lógica central del servicio de protección
+whm-plugin/mailguard.cgi    -> Interfaz de administración en WHM
+backend/db/schema.sql       -> Definición de estructura de datos
+whm-plugin/mailguard.conf   -> Parámetros de configuración
+
+
+================================================================================
+PRÓXIMOS PASOS SUGERIDOS:
+================================================================================
+
+1. Completar el archivo README.md con documentación completa
+2. Implementar el código Python en mailguard.py
+3. Implementar el esquema de base de datos en schema.sql
+4. Crear la interfaz CGI en mailguard.cgi
+5. Configurar el archivo mailguard.conf con parámetros iniciales
+6. Crear/completar los scripts de instalación y desinstalación
+7. Añadir capturas de pantalla en docs/screenshots/
+
+================================================================================
+NOTAS:
+================================================================================
+
+- Todos los archivos de código actual están vacíos
+- La estructura del proyecto sugiere una arquitectura separada entre
+  interfaz web (WHM) y lógica de backend (servicio Python)
+- Se utiliza systemd para la gestión del servicio en segundo plano
+- Se requiere una base de datos SQL para almacenar información
+
+================================================================================
+Fecha de creación: 02 de abril de 2026
+Última actualización: 02 de abril de 2026
+================================================================================
