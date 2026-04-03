@@ -1,6 +1,6 @@
 #!/bin/bash
 # WHM MailGuard - Uninstaller
-# https://github.com/tu-usuario/whm-mailguard
+# https://github.com/MotionPulseWs/whm-mailguard
 
 set -e
 

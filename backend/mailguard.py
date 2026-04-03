@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # WHM MailGuard - Detection Engine
-# https://github.com/tu-usuario/whm-mailguard
+# https://github.com/MotionPulseWs/whm-mailguard
 
 import re
 import sqlite3

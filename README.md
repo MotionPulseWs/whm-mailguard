@@ -31,7 +31,7 @@ Monitorea logs de Exim/Dovecot en tiempo real y bloquea IPs maliciosas automáti
 ## 🚀 Instalación
 ```bash
 # Clonar el repositorio
-git clone https://github.com/tu-usuario/whm-mailguard.git
+git clone https://github.com/MotionPulseWs/whm-mailguard.git
 cd whm-mailguard
 
 # Dar permisos al instalador

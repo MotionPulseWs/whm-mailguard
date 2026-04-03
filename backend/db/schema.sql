@@ -1,5 +1,5 @@
 -- WHM MailGuard - Database Schema
--- https://github.com/tu-usuario/whm-mailguard
+-- https://github.com/MotionPulseWs/whm-mailguard
 
 CREATE TABLE IF NOT EXISTS blocked_ips (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,

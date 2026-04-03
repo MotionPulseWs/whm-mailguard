@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 # WHM MailGuard - WHM Plugin Interface
-# https://github.com/tu-usuario/whm-mailguard
+# https://github.com/MotionPulseWs/whm-mailguard
 
 use strict;
 use warnings;
