@@ -32,7 +32,7 @@ log = logging.getLogger('mailguard')
 # Detecta líneas como:
 # dovecot_login authenticator failed for H=(...) [1.2.3.4]:port: 535 ... (set_id=user@domain)
 PATTERN = re.compile(
-    r'authenticator failed for.*?\[(\d+\.\d+\.\d+\.\d+)\].*?set_id=([^\s\)]+)'
+    r'authenticator failed for.*?\[([0-9a-fA-F:.]+)\].*?set_id=([^\s\)]+)'
 )
 
 # ─── Base de datos ────────────────────────────────────────────────────────────
