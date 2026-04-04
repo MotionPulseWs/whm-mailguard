@@ -387,10 +387,17 @@ tr:hover td{background:#f6f8fa}
 <script>
 var MG_URL = window.location.href.split('?')[0];
 
-document.addEventListener('DOMContentLoaded', function() {
+function mgBindEvents() {
     var switchBtn = document.getElementById('mg-switch-btn');
     if (switchBtn) switchBtn.addEventListener('click', mgToggle);
-});
+}
+
+// Ejecutar inmediatamente o cuando el DOM esté listo
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mgBindEvents);
+} else {
+    mgBindEvents();
+}
 
 function mgTab(name, el) {
     document.querySelectorAll('.mg-panel').forEach(function(p){ p.classList.remove('active'); });
