@@ -24,7 +24,6 @@ function mgApi(params, callback) {
 }
 
 function mgToggle() {
-    if (!confirm('¿Cambiar estado del sistema?')) return;
     mgApi({ action: 'toggle_enabled' }, function(d) {
         if (d.success) {
             mgToast(d.enabled === '1' ? 'Sistema ACTIVADO' : 'Sistema DESACTIVADO');
@@ -34,7 +33,7 @@ function mgToggle() {
 }
 
 function mgUnblock(ip) {
-    if (!confirm('Desbloquear ' + ip + '?')) return;
+    
     mgApi({ action: 'unblock', ip: ip }, function(d) {
         if (d.success) { mgToast('IP ' + ip + ' desbloqueada'); setTimeout(function(){ location.reload(); }, 1500); }
     });
