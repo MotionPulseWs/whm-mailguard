@@ -131,7 +131,7 @@ def send_notification(ip, account, attempts, block_minutes):
             f'IP:       {ip}\n'
             f'Cuenta:   {account}\n'
             f'Intentos: {attempts}\n'
-            f'Duración: {block_minutes} minutos\n'
+            f'Duracion: {block_minutes} minutos\n'
             f'Fecha:    {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n'
         )
         msg = f'Subject: {subject}\nFrom: mailguard@localhost\nTo: {email}\n\n{body}'
