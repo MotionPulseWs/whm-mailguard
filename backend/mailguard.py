@@ -126,14 +126,14 @@ def send_notification(ip, account, attempts, block_minutes):
     try:
         email   = get_config('notify_email', 'monitor@motionpulse.net')
         subject = f'[MailGuard] IP bloqueada: {ip}'
-        body    = (
-            f'WHM MailGuard bloqueó una IP.\n\n'
-            f'IP:       {ip}\n'
-            f'Cuenta:   {account}\n'
-            f'Intentos: {attempts}\n'
-            f'Duracion: {block_minutes} minutos\n'
-            f'Fecha:    {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n'
-        )
+        body = (
+          'WHM MailGuard bloqueo una IP.\n\n'
+          'IP:       ' + ip + '\n'
+          'Cuenta:   ' + account + '\n'
+          'Intentos: ' + str(attempts) + '\n'
+          'Duracion: ' + str(block_minutes) + ' minutos\n'
+          'Fecha:    ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + '\n'
+      )
         msg = f'Subject: {subject}\nFrom: mailguard@localhost\nTo: {email}\n\n{body}'
         with smtplib.SMTP('localhost') as s:
             s.sendmail('mailguard@localhost', [email], msg)
