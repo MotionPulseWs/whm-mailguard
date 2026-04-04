@@ -1,0 +1,25 @@
+[%
+USE Whostmgr;
+WRAPPER 'master_templates/master.tmpl'
+        header = 'MailGuard'
+        skipsupport = 1
+        skipheader = 1
+        hide_license_warnings = 1
+        theme='bootstrap'
+        breadcrumbdata = {
+                previous = [
+                {
+                        name = "Home",
+                        url  = "/scripts/command?PFILE=main",
+                },
+                {
+                        name = "Seguridad",
+                        url  = "/scripts/command?PFILE=main",
+                }
+                ],
+                name = 'MailGuard',
+                url = '/cgi/mailguard.pl',
+        };
+%]
+[% mailguard_output %]
+[% END %]

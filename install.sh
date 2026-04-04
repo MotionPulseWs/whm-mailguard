@@ -14,8 +14,8 @@ NC='\033[0m'
 # ─── Variables ────────────────────────────────────────────────────────────────
 INSTALL_DIR='/usr/local/mailguard'
 SERVICE_NAME='mailguard'
-WHM_PLUGIN_DIR='/usr/local/cpanel/whostmgr/docroot/cgi'
-WHM_ADDON_DIR='/usr/local/cpanel/whostmgr/addonfeatures'
+WHM_CGI_DIR='/usr/local/cpanel/whostmgr/docroot/cgi'
+WHM_TMPL_DIR='/usr/local/cpanel/whostmgr/docroot/templates'
 LOG_FILE='/var/log/mailguard.log'
 
 # ─── Funciones ────────────────────────────────────────────────────────────────
@@ -27,55 +27,42 @@ error()   { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 # ─── Verificaciones previas ───────────────────────────────────────────────────
 check_requirements() {
     info "Verificando requisitos..."
-
-    [ "$EUID" -ne 0 ] && error "Debe ejecutarse como root"
-
-    command -v python3 &>/dev/null || error "Python3 no está instalado"
-
-    python3 -c "import sqlite3, subprocess, re" 2>/dev/null \
-        || error "Módulos Python requeridos no disponibles"
-
-    command -v iptables &>/dev/null || error "iptables no está instalado"
-
-    [ -f /var/log/exim_mainlog ] || error "No se encontró /var/log/exim_mainlog"
-
-    [ -d /usr/local/cpanel ] || warning "cPanel no detectado — el plugin WHM no se instalará"
-
+    [ "$EUID" -ne 0 ]                          && error "Debe ejecutarse como root"
+    command -v python3 &>/dev/null             || error "Python3 no está instalado"
+    python3 -c "import sqlite3, subprocess, re" 2>/dev/null || error "Módulos Python requeridos no disponibles"
+    command -v iptables &>/dev/null            || error "iptables no está instalado"
+    [ -f /var/log/exim_mainlog ]               || error "No se encontró /var/log/exim_mainlog"
+    [ -d /usr/local/cpanel ]                   || warning "cPanel no detectado — el plugin WHM no se instalará"
     success "Requisitos verificados"
 }
 
-# ─── Instalación de archivos ──────────────────────────────────────────────────
-install_files() {
-    info "Instalando archivos en $INSTALL_DIR..."
+# ─── Instalación de archivos backend ─────────────────────────────────────────
+install_backend() {
+    info "Instalando backend en $INSTALL_DIR..."
 
     mkdir -p "$INSTALL_DIR/backend/db"
-
-    cp -r backend/   "$INSTALL_DIR/"
-    cp -r whm-plugin/ "$INSTALL_DIR/"
-
+    cp -r backend/  "$INSTALL_DIR/"
     chmod +x "$INSTALL_DIR/backend/mailguard.py"
 
     touch "$LOG_FILE"
     chmod 640 "$LOG_FILE"
 
-    success "Archivos instalados"
+    success "Backend instalado"
 }
 
 # ─── Base de datos ────────────────────────────────────────────────────────────
 setup_database() {
     info "Creando base de datos..."
 
-    DB_PATH="$INSTALL_DIR/backend/db/mailguard.db"
-
     python3 -c "
 import sqlite3
-conn = sqlite3.connect('$DB_PATH')
+conn = sqlite3.connect('$INSTALL_DIR/backend/db/mailguard.db')
 with open('$INSTALL_DIR/backend/db/schema.sql') as f:
     conn.executescript(f.read())
 conn.close()
-print('Base de datos creada')
+print('OK')
 "
-    chmod 640 "$DB_PATH"
+    chmod 640 "$INSTALL_DIR/backend/db/mailguard.db"
     success "Base de datos lista"
 }
 
@@ -83,39 +70,48 @@ print('Base de datos creada')
 setup_whitelist() {
     info "Configurando whitelist inicial..."
 
-    # Obtener IP del servidor
     SERVER_IP=$(curl -s -4 ifconfig.me 2>/dev/null || echo "")
 
     python3 -c "
 import sqlite3
 conn = sqlite3.connect('$INSTALL_DIR/backend/db/mailguard.db')
 ips = [
-    ('127.0.0.1',  'Localhost'),
-    ('::1',        'Localhost IPv6'),
+    ('127.0.0.1', 'Localhost'),
+    ('::1',       'Localhost IPv6'),
 ]
-server_ip = '$SERVER_IP'
-if server_ip:
-    ips.append((server_ip, 'IP del servidor'))
-
+if '$SERVER_IP':
+    ips.append(('$SERVER_IP', 'IP del servidor'))
 for ip, label in ips:
-    conn.execute('''
-        INSERT OR IGNORE INTO whitelist (ip, label, added_by)
-        VALUES (?, ?, ?)
-    ''', (ip, label, 'install'))
+    conn.execute('INSERT OR IGNORE INTO whitelist (ip, label, added_by) VALUES (?, ?, ?)', (ip, label, 'install'))
 conn.commit()
 conn.close()
-print(f'Whitelist configurada con {len(ips)} entradas')
 "
     success "Whitelist inicial configurada"
+}
+
+# ─── IP del administrador ─────────────────────────────────────────────────────
+add_admin_ip() {
+    echo ""
+    echo -e "${YELLOW}¿Cuál es tu IP fija de administración?${NC} (Enter para omitir)"
+    read -r -p "IP: " ADMIN_IP
+
+    if [ -n "$ADMIN_IP" ]; then
+        python3 -c "
+import sqlite3
+conn = sqlite3.connect('$INSTALL_DIR/backend/db/mailguard.db')
+conn.execute('INSERT OR IGNORE INTO whitelist (ip, label, added_by) VALUES (?, ?, ?)', ('$ADMIN_IP', 'IP Admin', 'install'))
+conn.commit()
+conn.close()
+"
+        success "IP $ADMIN_IP agregada a whitelist"
+    fi
 }
 
 # ─── Servicio systemd ─────────────────────────────────────────────────────────
 install_service() {
     info "Instalando servicio systemd..."
 
-    cp "$INSTALL_DIR/backend/mailguard.service" \
-       "/etc/systemd/system/$SERVICE_NAME.service"
-
+    cp "$INSTALL_DIR/backend/mailguard.service" "/etc/systemd/system/$SERVICE_NAME.service"
     systemctl daemon-reload
     systemctl enable "$SERVICE_NAME"
     systemctl start  "$SERVICE_NAME"
@@ -138,52 +134,28 @@ install_whm_plugin() {
 
     info "Instalando plugin WHM..."
 
-    cp "$INSTALL_DIR/whm-plugin/mailguard.cgi" "$WHM_PLUGIN_DIR/"
-    chmod 755 "$WHM_PLUGIN_DIR/mailguard.cgi"
+    # Copiar el script Perl principal
+    cp "$INSTALL_DIR/whm-plugin/mailguard.pl" "$WHM_CGI_DIR/"
+    chmod 755 "$WHM_CGI_DIR/mailguard.pl"
 
-    cp "$INSTALL_DIR/whm-plugin/mailguard.conf" "$WHM_ADDON_DIR/" 2>/dev/null || true
+    # Copiar el template WHM
+    cp "$INSTALL_DIR/whm-plugin/mailguard.tmpl" "$WHM_TMPL_DIR/"
+    chmod 644 "$WHM_TMPL_DIR/mailguard.tmpl"
 
     success "Plugin WHM instalado"
+    echo -e "  Accede en: ${BLUE}https://TU_IP:2087/cgi/mailguard.pl${NC}"
 }
 
-# ─── Agregar IP del admin ─────────────────────────────────────────────────────
-add_admin_ip() {
-    echo ""
-    echo -e "${YELLOW}¿Cuál es tu IP fija de administración?${NC}"
-    echo -e "  (Déjalo vacío para omitir)"
-    read -r -p "IP: " ADMIN_IP
-
-    if [ -n "$ADMIN_IP" ]; then
-        python3 -c "
-import sqlite3
-conn = sqlite3.connect('$INSTALL_DIR/backend/db/mailguard.db')
-conn.execute('''
-    INSERT OR IGNORE INTO whitelist (ip, label, added_by)
-    VALUES (?, 'IP Admin', 'install')
-''', ('$ADMIN_IP',))
-conn.commit()
-conn.close()
-"
-        success "IP $ADMIN_IP agregada a whitelist"
-    fi
-}
-
-# ─── Resumen final ────────────────────────────────────────────────────────────
+# ─── Resumen ──────────────────────────────────────────────────────────────────
 show_summary() {
     echo ""
     echo -e "${GREEN}╔══════════════════════════════════════════╗${NC}"
     echo -e "${GREEN}║     WHM MailGuard instalado con éxito    ║${NC}"
     echo -e "${GREEN}╚══════════════════════════════════════════╝${NC}"
     echo ""
-    echo -e "  Directorio:  ${BLUE}$INSTALL_DIR${NC}"
-    echo -e "  Log:         ${BLUE}$LOG_FILE${NC}"
-    echo -e "  Servicio:    ${BLUE}systemctl status $SERVICE_NAME${NC}"
-    echo -e "  Plugin WHM:  ${BLUE}WHM → Plugins → MailGuard${NC}"
-    echo ""
-    echo -e "  Comandos útiles:"
-    echo -e "    ${YELLOW}systemctl status mailguard${NC}   — ver estado"
-    echo -e "    ${YELLOW}systemctl stop mailguard${NC}     — detener"
-    echo -e "    ${YELLOW}tail -f /var/log/mailguard.log${NC} — ver logs en vivo"
+    echo -e "  Servicio:  ${BLUE}systemctl status mailguard${NC}"
+    echo -e "  Log:       ${BLUE}tail -f /var/log/mailguard.log${NC}"
+    echo -e "  Plugin:    ${BLUE}https://TU_IP:2087/cgi/mailguard.pl${NC}"
     echo ""
 }
 
@@ -196,7 +168,7 @@ main() {
     echo ""
 
     check_requirements
-    install_files
+    install_backend
     setup_database
     setup_whitelist
     add_admin_ip

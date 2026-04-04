@@ -15,6 +15,8 @@ ESTRUCTURA DEL PROYECTO:
 
 ROOT: e:/2026 WEB/Proyectos JSX/whm-mailguard/
 │
+├── mailguard.pl                  # Script Perl para procesar correos
+├── mailguard.tmpl                # Plantilla de configuración
 ├── install.sh                    # Script de instalación del plugin
 ├── uninstall.sh                  # Script de desinstalación del plugin
 ├── README.md                     # Documentación principal (vacío)
