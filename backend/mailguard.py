@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 # WHM MailGuard - Detection Engine
 # https://github.com/MotionPulseWs/whm-mailguard
 
@@ -106,7 +107,7 @@ def unblock_ip(ip, reason='auto'):
             VALUES ('unblock', ?, ?)
         ''', (ip, f'Desbloqueado por: {reason}'))
 
-    log.info(f'DESBLOQUEADO: {ip} | razón: {reason}')
+    log.info('DESBLOQUEADO: ' + ip + ' | razon: ' + reason)
 
 # ─── Desbloqueo automático ────────────────────────────────────────────────────
 def process_auto_unblocks():
@@ -127,18 +128,18 @@ def send_notification(ip, account, attempts, block_minutes):
         email   = get_config('notify_email', 'monitor@motionpulse.net')
         subject = f'[MailGuard] IP bloqueada: {ip}'
         body = (
-          'WHM MailGuard bloqueo una IP.\n\n'
-          'IP:       ' + ip + '\n'
-          'Cuenta:   ' + account + '\n'
-          'Intentos: ' + str(attempts) + '\n'
-          'Duracion: ' + str(block_minutes) + ' minutos\n'
-          'Fecha:    ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + '\n'
-      )
+            'WHM MailGuard bloqueo una IP.\n\n'
+            'IP:       ' + ip + '\n'
+            'Cuenta:   ' + account + '\n'
+            'Intentos: ' + str(attempts) + '\n'
+            'Duracion: ' + str(block_minutes) + ' minutos\n'
+            'Fecha:    ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + '\n'
+        )
         msg = f'Subject: {subject}\nFrom: mailguard@localhost\nTo: {email}\n\n{body}'
         with smtplib.SMTP('localhost') as s:
             s.sendmail('mailguard@localhost', [email], msg)
     except Exception as e:
-        log.warning(f'No se pudo enviar notificación: {e}')
+        log.warning('No se pudo enviar notificacion: ' + str(e))
 
 # ─── Motor principal ──────────────────────────────────────────────────────────
 def run():
