@@ -134,16 +134,23 @@ install_whm_plugin() {
 
     info "Instalando plugin WHM..."
 
-    # Copiar el script Perl principal
-    cp "$INSTALL_DIR/whm-plugin/mailguard.pl" "$WHM_CGI_DIR/"
-    chmod 755 "$WHM_CGI_DIR/mailguard.pl"
+    # Crear subcarpeta del plugin
+    mkdir -p "$WHM_CGI_DIR/mailguard"
+
+    # Copiar el script Perl como index.cgi
+    cp "$INSTALL_DIR/whm-plugin/mailguard.pl" "$WHM_CGI_DIR/mailguard/index.cgi"
+    chmod 755 "$WHM_CGI_DIR/mailguard/index.cgi"
 
     # Copiar el template WHM
     cp "$INSTALL_DIR/whm-plugin/mailguard.tmpl" "$WHM_TMPL_DIR/"
     chmod 644 "$WHM_TMPL_DIR/mailguard.tmpl"
 
+    # Registrar el plugin en el menú de WHM
+    cp "$INSTALL_DIR/whm-plugin/mailguard.conf" /var/cpanel/apps/
+    /usr/local/cpanel/bin/register_appconfig /var/cpanel/apps/mailguard.conf
+
     success "Plugin WHM instalado"
-    echo -e "  Accede en: ${BLUE}https://TU_IP:2087/cgi/mailguard.pl${NC}"
+    echo -e "  Accede en: ${BLUE}https://TU_IP:2087/cgi/mailguard/index.cgi${NC}"
 }
 
 # ─── Resumen ──────────────────────────────────────────────────────────────────
