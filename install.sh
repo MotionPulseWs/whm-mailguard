@@ -41,7 +41,14 @@ install_backend() {
     info "Instalando backend en $INSTALL_DIR..."
 
     mkdir -p "$INSTALL_DIR/backend/db"
-    cp -r backend/  "$INSTALL_DIR/"
+    mkdir -p "$INSTALL_DIR/whm-plugin/assets"
+
+    # Solo copiar si no estamos en el mismo directorio
+    if [ "$(pwd)" != "$INSTALL_DIR" ]; then
+        cp -r backend/  "$INSTALL_DIR/"
+        cp -r whm-plugin/ "$INSTALL_DIR/"
+    fi
+
     chmod +x "$INSTALL_DIR/backend/mailguard.py"
 
     touch "$LOG_FILE"
@@ -134,23 +141,22 @@ install_whm_plugin() {
 
     info "Instalando plugin WHM..."
 
-    # Crear subcarpeta del plugin
-    mkdir -p "$WHM_CGI_DIR/mailguard"
+    mkdir -p "$WHM_CGI_DIR/mailguard/assets"
 
-    # Copiar el script Perl como index.cgi
     cp "$INSTALL_DIR/whm-plugin/mailguard.pl" "$WHM_CGI_DIR/mailguard/index.cgi"
     chmod 755 "$WHM_CGI_DIR/mailguard/index.cgi"
 
-    # Copiar el template WHM
+    cp "$INSTALL_DIR/whm-plugin/assets/mailguard.js" "$WHM_CGI_DIR/mailguard/assets/"
+    chmod 644 "$WHM_CGI_DIR/mailguard/assets/mailguard.js"
+
     cp "$INSTALL_DIR/whm-plugin/mailguard.tmpl" "$WHM_TMPL_DIR/"
     chmod 644 "$WHM_TMPL_DIR/mailguard.tmpl"
 
-    # Registrar el plugin en el menú de WHM
     cp "$INSTALL_DIR/whm-plugin/mailguard.conf" /var/cpanel/apps/
     /usr/local/cpanel/bin/register_appconfig /var/cpanel/apps/mailguard.conf
 
     success "Plugin WHM instalado"
-    echo -e "  Accede en: ${BLUE}https://TU_IP:2087/cgi/mailguard/index.cgi${NC}"
+    echo -e "  Accede en: ${BLUE}WHM → Plugins → MailGuard${NC}"
 }
 
 # ─── Resumen ──────────────────────────────────────────────────────────────────
