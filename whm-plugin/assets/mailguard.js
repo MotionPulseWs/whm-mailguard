@@ -99,4 +99,17 @@ function mgSaveConfig() {
     });
 }
 
+function mgBindAll() {
+    var switchBtn = document.getElementById('mg-switch-btn');
+    if (switchBtn) {
+        switchBtn.onclick = mgToggle;
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mgBindAll);
+} else {
+    mgBindAll();
+}
+
 setInterval(function(){ location.reload(); }, 30000);
