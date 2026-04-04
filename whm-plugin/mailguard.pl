@@ -307,7 +307,7 @@ tr:hover td{background:#f6f8fa}
         <h2>$switch_icon Estado: <strong>$switch_label</strong></h2>
         <p>$status_text</p>
     </div>
-    <button class="mg-switch-btn" onclick="mgToggle()">$switch_icon $switch_label</button>
+    <button class="mg-switch-btn" id="mg-switch-btn">$switch_icon $switch_label</button>
 </div>
 
 <div class="mg-grid">
@@ -386,6 +386,11 @@ tr:hover td{background:#f6f8fa}
 
 <script>
 var MG_URL = window.location.href.split('?')[0];
+
+document.addEventListener('DOMContentLoaded', function() {
+    var switchBtn = document.getElementById('mg-switch-btn');
+    if (switchBtn) switchBtn.addEventListener('click', mgToggle);
+});
 
 function mgTab(name, el) {
     document.querySelectorAll('.mg-panel').forEach(function(p){ p.classList.remove('active'); });
