@@ -136,6 +136,19 @@ if ($action eq 'add_whitelist' && $ip) {
     exit;
 }
 
+# Eliminar de whitelist
+if ($action eq 'remove_whitelist' && $ip) {
+    print "Content-type: application/json\r\n\r\n";
+    my $dbh = get_db();
+    if ($dbh) {
+        $dbh->do("DELETE FROM whitelist WHERE ip=?", {}, $ip);
+        $dbh->do("INSERT INTO events (event_type, ip, detail) VALUES ('whitelist_remove', ?, 'Eliminado de whitelist')", {}, $ip);
+        $dbh->disconnect();
+    }
+    print '{"success":1}';
+    exit;
+}
+
 # Buscar IP
 if ($action eq 'search' && $ip) {
     print "Content-type: application/json\r\n\r\n";
@@ -242,7 +255,7 @@ for my $r (@whitelist) {
     my $rip  = $r->{ip}       // '';
     my $rlbl = $r->{label}    // '';
     my $rdat = $r->{added_at} // '';
-    $rows_whitelist .= "<tr><td><span class=\"mg-ip\">$rip</span></td><td>$rlbl</td><td>$rdat</td></tr>\n";
+    $rows_whitelist .= "<tr><td><span class=\"mg-ip\">$rip</span></td><td>$rlbl</td><td>$rdat</td><td><button class=\"mg-btn mg-btn-sm mg-btn-danger\" onclick=\"mgRemoveWhitelist('$rip')\">Eliminar</button></td></tr>\n";
 }
 
 my $cfg_max      = get_config('max_attempts',    '10');
@@ -325,6 +338,10 @@ tr:hover td{background:#f6f8fa}
     <button class="mg-tab" onclick="mgTab('config',this)">⚙️ Configuración</button>
 </div>
 
+<div style="text-align:right;margin-bottom:12px">
+    <button class="mg-btn mg-btn-blue" onclick="mgReload()">↻ Recargar</button>
+</div>
+
 <div id="mg-panel-blocked" class="mg-panel active">
     <div class="mg-table-wrap">
         <table>
@@ -359,7 +376,7 @@ tr:hover td{background:#f6f8fa}
     </div>
     <div class="mg-table-wrap">
         <table>
-            <thead><tr><th>IP</th><th>Etiqueta</th><th>Agregada</th></tr></thead>
+            <thead><tr><th>IP</th><th>Etiqueta</th><th>Agregada</th><th>Acciones</th></tr></thead>
             <tbody>$rows_whitelist</tbody>
         </table>
     </div>

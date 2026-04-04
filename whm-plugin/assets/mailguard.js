@@ -112,4 +112,12 @@ if (document.readyState === 'loading') {
     mgBindAll();
 }
 
-setInterval(function(){ location.reload(); }, 30000);
+function mgRemoveWhitelist(ip) {
+    mgApi({ action: 'remove_whitelist', ip: ip }, function(d) {
+        if (d.success) { mgToast('IP ' + ip + ' eliminada de whitelist'); setTimeout(function(){ location.reload(); }, 1500); }
+    });
+}
+
+function mgReload() {
+    location.reload();
+}
