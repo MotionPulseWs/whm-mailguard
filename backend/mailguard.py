@@ -92,7 +92,7 @@ def block_ip(ip, account, attempts):
 
 def unblock_ip(ip, reason='auto'):
     subprocess.run(['iptables', '-D', 'INPUT', '-s', ip, '-j', 'DROP'],
-                   capture_output=True)
+               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     with get_db() as db:
         db.execute('''
