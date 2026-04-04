@@ -65,8 +65,8 @@ def block_ip(ip, account, attempts):
 
     # Bloquear con iptables
     result = subprocess.run(
-        ['iptables', '-I', 'INPUT', '-s', ip, '-j', 'DROP'],
-        capture_output=True, text=True
+    ['iptables', '-I', 'INPUT', '-s', ip, '-j', 'DROP'],
+    stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
 
     if result.returncode != 0:
