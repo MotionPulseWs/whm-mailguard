@@ -70,10 +70,14 @@ def block_ip(ip, account, attempts, reason='ip'):
     block_minutes = int(get_config('block_minutes', '60'))
     unblock_at    = datetime.now() + timedelta(minutes=block_minutes)
 
+   # Detectar si es IPv6
+    is_ipv6 = ':' in ip
+    cmd_block = 'ip6tables' if is_ipv6 else 'iptables'
+
     result = subprocess.run(
-        ['iptables', '-I', 'INPUT', '-s', ip, '-j', 'DROP'],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
+          [cmd_block, '-I', 'INPUT', '-s', ip, '-j', 'DROP'],
+          stdout=subprocess.PIPE, stderr=subprocess.PIPE
+      )
 
     if result.returncode != 0:
         log.error('Error bloqueando ' + ip + ': ' + str(result.stderr))
@@ -100,8 +104,11 @@ def block_ip(ip, account, attempts, reason='ip'):
     return True
 
 def unblock_ip(ip, reason='auto'):
+    is_ipv6 = ':' in ip
+    cmd_unblock = 'ip6tables' if is_ipv6 else 'iptables'
+
     subprocess.run(
-        ['iptables', '-D', 'INPUT', '-s', ip, '-j', 'DROP'],
+        [cmd_unblock, '-D', 'INPUT', '-s', ip, '-j', 'DROP'],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
 
