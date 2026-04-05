@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS config (
 INSERT OR IGNORE INTO config (key, value) VALUES
     ('enabled',         '1'),       -- 1=activo, 0=apagado (switch emergencia)
     ('max_attempts',    '10'),      -- intentos antes de bloquear
+    ('max_ips_per_account', '5'),   -- IPs distintas atacando misma cuenta antes de bloquear
     ('window_minutes',  '10'),      -- ventana de tiempo para contar intentos
     ('block_minutes',   '60'),      -- duración del bloqueo
     ('log_path',        '/var/log/exim_mainlog'),

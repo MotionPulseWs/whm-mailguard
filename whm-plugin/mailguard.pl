@@ -394,6 +394,10 @@ tr:hover td{background:#f6f8fa}
                 <div class="mg-form-group"><label>Email de notificaciones</label><input type="email" id="cfg-notify_email" value="$cfg_email" /></div>
                 <div class="mg-form-group"><label>Notificar al bloquear (1=sí, 0=no)</label><input type="number" id="cfg-notify_on_block" value="$cfg_notify" min="0" max="1" /></div>
             </div>
+            <div class="mg-form-group">
+                <label>Max IPs distintas por cuenta antes de bloquear</label>
+                <input type="number" id="cfg-max_ips_per_account" value="5" min="2" max="20" />
+            </div>
         </div>
         <button class="mg-btn mg-btn-blue" onclick="mgSaveConfig()">💾 Guardar</button>
     </div>

@@ -30,8 +30,6 @@ logging.basicConfig(
 log = logging.getLogger('mailguard')
 
 # ─── Patrón de detección en logs de Exim ─────────────────────────────────────
-# Detecta líneas como:
-# dovecot_login authenticator failed for H=(...) [1.2.3.4]:port: 535 ... (set_id=user@domain)
 PATTERN = re.compile(
     r'authenticator failed for.*?\[([0-9a-fA-F:.]+)\].*?set_id=([^\s\)]+)'
 )
@@ -56,26 +54,36 @@ def is_whitelisted(ip):
         return row is not None
 
 # ─── Bloqueo de IPs ───────────────────────────────────────────────────────────
-def block_ip(ip, account, attempts):
+def block_ip(ip, account, attempts, reason='ip'):
     if is_whitelisted(ip):
-        log.info(f'IP {ip} en whitelist, ignorando bloqueo')
+        log.info('IP ' + ip + ' en whitelist, ignorando bloqueo')
         return False
+
+    # Verificar si ya está bloqueada
+    with get_db() as db:
+        active = db.execute(
+            'SELECT id FROM blocked_ips WHERE ip=? AND is_active=1', (ip,)
+        ).fetchone()
+        if active:
+            return False
 
     block_minutes = int(get_config('block_minutes', '60'))
     unblock_at    = datetime.now() + timedelta(minutes=block_minutes)
 
-    # Bloquear con iptables
     result = subprocess.run(
-    ['iptables', '-I', 'INPUT', '-s', ip, '-j', 'DROP'],
-    stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        ['iptables', '-I', 'INPUT', '-s', ip, '-j', 'DROP'],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
 
     if result.returncode != 0:
-        log.error(f'Error bloqueando {ip}: {result.stderr}')
+        log.error('Error bloqueando ' + ip + ': ' + str(result.stderr))
         return False
 
-    # Guardar en base de datos
     domain = account.split('@')[1] if '@' in account else None
+    detail = str(attempts) + ' intentos fallidos'
+    if reason == 'account':
+        detail = 'Ataque distribuido a cuenta: ' + account
+
     with get_db() as db:
         db.execute('''
             INSERT INTO blocked_ips (ip, attempts, account, domain, unblock_at)
@@ -85,15 +93,17 @@ def block_ip(ip, account, attempts):
         db.execute('''
             INSERT INTO events (event_type, ip, account, detail)
             VALUES ('block', ?, ?, ?)
-        ''', (ip, account, f'{attempts} intentos fallidos'))
+        ''', (ip, account, detail))
 
-    log.info(f'BLOQUEADO: {ip} | cuenta: {account} | intentos: {attempts} | hasta: {unblock_at}')
-    send_notification(ip, account, attempts, block_minutes)
+    log.info('BLOQUEADO: ' + ip + ' | cuenta: ' + account + ' | intentos: ' + str(attempts) + ' | razon: ' + reason + ' | hasta: ' + str(unblock_at))
+    send_notification(ip, account, attempts, block_minutes, reason)
     return True
 
 def unblock_ip(ip, reason='auto'):
-    subprocess.run(['iptables', '-D', 'INPUT', '-s', ip, '-j', 'DROP'],
-               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    subprocess.run(
+        ['iptables', '-D', 'INPUT', '-s', ip, '-j', 'DROP'],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
 
     with get_db() as db:
         db.execute('''
@@ -105,7 +115,7 @@ def unblock_ip(ip, reason='auto'):
         db.execute('''
             INSERT INTO events (event_type, ip, detail)
             VALUES ('unblock', ?, ?)
-        ''', (ip, f'Desbloqueado por: {reason}'))
+        ''', (ip, 'Desbloqueado por: ' + reason))
 
     log.info('DESBLOQUEADO: ' + ip + ' | razon: ' + reason)
 
@@ -121,17 +131,24 @@ def process_auto_unblocks():
         unblock_ip(row['ip'], reason='auto')
 
 # ─── Notificaciones ───────────────────────────────────────────────────────────
-def send_notification(ip, account, attempts, block_minutes):
+def send_notification(ip, account, attempts, block_minutes, reason='ip'):
     if get_config('notify_on_block', '1') != '1':
         return
     try:
         email   = get_config('notify_email', 'monitor@motionpulse.net')
-        subject = f'[MailGuard] IP bloqueada: {ip}'
+        subject = '[MailGuard] IP bloqueada: ' + ip
+
+        if reason == 'account':
+            tipo = 'Ataque distribuido detectado (multiples IPs atacando misma cuenta)'
+        else:
+            tipo = 'Exceso de intentos fallidos desde una IP'
+
         body = (
             'WHM MailGuard bloqueo una IP.\r\n\r\n'
             'IP:       ' + ip + '\r\n'
             'Cuenta:   ' + account + '\r\n'
             'Intentos: ' + str(attempts) + '\r\n'
+            'Tipo:     ' + tipo + '\r\n'
             'Duracion: ' + str(block_minutes) + ' minutos\r\n'
             'Fecha:    ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + '\r\n'
         )
@@ -145,8 +162,11 @@ def send_notification(ip, account, attempts, block_minutes):
 def run():
     log.info('WHM MailGuard iniciado')
 
-    # Contadores en memoria: {ip: [(timestamp, account), ...]}
+    # Tracker por IP: {ip: [(timestamp, account), ...]}
     attempts_tracker = defaultdict(list)
+
+    # Tracker por cuenta: {account: [(timestamp, ip), ...]}
+    account_tracker = defaultdict(list)
 
     exim_log = get_config('log_path', '/var/log/exim_mainlog')
 
@@ -156,7 +176,7 @@ def run():
         while True:
             # ── Switch de emergencia ──────────────────────────────────────────
             if not is_enabled():
-                log.warning('MailGuard DESACTIVADO — modo pasivo')
+                log.warning('MailGuard DESACTIVADO - modo pasivo')
                 time.sleep(5)
                 continue
 
@@ -177,36 +197,64 @@ def run():
             account = match.group(2)
             now     = datetime.now()
 
-            # Ignorar si ya está bloqueada o en whitelist
+            # Ignorar si ya está en whitelist
             if is_whitelisted(ip):
                 continue
 
+            # ── Ventana de tiempo ─────────────────────────────────────────────
+            window  = int(get_config('window_minutes', '10'))
+            cutoff  = now - timedelta(minutes=window)
+
+            # ── REGLA 1: Bloqueo por IP ───────────────────────────────────────
+            # Verificar si ya está bloqueada
             with get_db() as db:
                 active = db.execute(
                     'SELECT id FROM blocked_ips WHERE ip=? AND is_active=1', (ip,)
                 ).fetchone()
-                if active:
-                    continue
+                if not active:
+                    attempts_tracker[ip].append((now, account))
+                    attempts_tracker[ip] = [
+                        (t, a) for t, a in attempts_tracker[ip] if t > cutoff
+                    ]
 
-            # ── Registrar intento ─────────────────────────────────────────────
-            window  = int(get_config('window_minutes', '10'))
-            cutoff  = now - timedelta(minutes=window)
-            attempts_tracker[ip].append((now, account))
+                    count        = len(attempts_tracker[ip])
+                    max_attempts = int(get_config('max_attempts', '10'))
 
-            # Limpiar intentos fuera de la ventana
-            attempts_tracker[ip] = [
-                (t, a) for t, a in attempts_tracker[ip] if t > cutoff
+                    if count >= max_attempts:
+                        if block_ip(ip, account, count, reason='ip'):
+                            attempts_tracker.pop(ip, None)
+                            # Limpiar también del tracker de cuenta
+                            if account in account_tracker:
+                                account_tracker[account] = [
+                                    (t, i) for t, i in account_tracker[account] if i != ip
+                                ]
+                            continue
+
+            # ── REGLA 2: Bloqueo por cuenta atacada ───────────────────────────
+            # Registrar intento en tracker de cuenta
+            account_tracker[account].append((now, ip))
+            account_tracker[account] = [
+                (t, i) for t, i in account_tracker[account] if t > cutoff
             ]
 
-            count = len(attempts_tracker[ip])
-            max_attempts = int(get_config('max_attempts', '10'))
+            # IPs únicas atacando esta cuenta en la ventana
+            ips_atacando = set(i for t, i in account_tracker[account])
+            max_ips      = int(get_config('max_ips_per_account', '5'))
 
-            log.debug(f'{ip} → {account} | intentos en ventana: {count}/{max_attempts}')
+            if len(ips_atacando) >= max_ips:
+                log.info(
+                    'Ataque distribuido detectado en cuenta: ' + account +
+                    ' | IPs atacantes: ' + str(len(ips_atacando))
+                )
+                bloqueadas = 0
+                for attacker_ip in ips_atacando:
+                    intentos = len([t for t, i in account_tracker[account] if i == attacker_ip])
+                    if block_ip(attacker_ip, account, intentos, reason='account'):
+                        bloqueadas += 1
+                        attempts_tracker.pop(attacker_ip, None)
 
-            # ── Bloquear si supera el umbral ──────────────────────────────────
-            if count >= max_attempts:
-                if block_ip(ip, account, count):
-                    attempts_tracker.pop(ip, None)
+                log.info('Ataque distribuido: ' + str(bloqueadas) + ' IPs bloqueadas para cuenta ' + account)
+                account_tracker.pop(account, None)
 
 # ─── Manejo de señales (para systemd) ────────────────────────────────────────
 def handle_signal(sig, frame):
