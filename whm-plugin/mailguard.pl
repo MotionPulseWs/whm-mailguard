@@ -389,15 +389,13 @@ tr:hover td{background:#f6f8fa}
                 <div class="mg-form-group"><label>Máximo de intentos antes de bloquear</label><input type="number" id="cfg-max_attempts" value="$cfg_max" min="3" max="50" /></div>
                 <div class="mg-form-group"><label>Ventana de tiempo (minutos)</label><input type="number" id="cfg-window_minutes" value="$cfg_window" min="1" max="60" /></div>
                 <div class="mg-form-group"><label>Duración del bloqueo (minutos)</label><input type="number" id="cfg-block_minutes" value="$cfg_block" min="5" max="1440" /></div>
+                <div class="mg-form-group"><label>Max IPs distintas por cuenta antes de bloquear</label><input type="number" id="cfg-max_ips_per_account" value="5" min="2" max="20" /></div>
             </div>
             <div>
                 <div class="mg-form-group"><label>Email de notificaciones</label><input type="email" id="cfg-notify_email" value="$cfg_email" /></div>
                 <div class="mg-form-group"><label>Notificar al bloquear (1=sí, 0=no)</label><input type="number" id="cfg-notify_on_block" value="$cfg_notify" min="0" max="1" /></div>
             </div>
-            <div class="mg-form-group">
-                <label>Max IPs distintas por cuenta antes de bloquear</label>
-                <input type="number" id="cfg-max_ips_per_account" value="5" min="2" max="20" />
-            </div>
+            
         </div>
         <button class="mg-btn mg-btn-blue" onclick="mgSaveConfig()">💾 Guardar</button>
     </div>
