@@ -68,7 +68,7 @@ def block_ip(ip, account, attempts, reason='ip'):
             return False
 
     block_minutes = int(get_config('block_minutes', '60'))
-    unblock_at    = datetime.now() + timedelta(minutes=block_minutes)
+    unblock_at = datetime.utcnow() + timedelta(minutes=block_minutes)
 
    # Detectar si es IPv6
     is_ipv6 = ':' in ip
@@ -157,7 +157,7 @@ def send_notification(ip, account, attempts, block_minutes, reason='ip'):
             'Intentos: ' + str(attempts) + '\r\n'
             'Tipo:     ' + tipo + '\r\n'
             'Duracion: ' + str(block_minutes) + ' minutos\r\n'
-            'Fecha:    ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + '\r\n'
+            'Fecha:    ' + datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S') + '\r\n'
         )
         msg = 'Subject: ' + subject + '\r\nFrom: mailguard@localhost\r\nTo: ' + email + '\r\n\r\n' + body
         with smtplib.SMTP('localhost') as s:
@@ -202,7 +202,7 @@ def run():
 
             ip      = match.group(1)
             account = match.group(2)
-            now     = datetime.now()
+            now     = datetime.utcnow()
 
             # Ignorar si ya está en whitelist
             if is_whitelisted(ip):
