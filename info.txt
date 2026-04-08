@@ -15,40 +15,43 @@ ESTRUCTURA DEL PROYECTO:
 
 ROOT: e:/2026 WEB/Proyectos JSX/whm-mailguard/
 │
-├── mailguard.pl                  # Script Perl para procesar correos
-├── mailguard.tmpl                # Plantilla de configuración
+├── backend/                      # Componente backend - Lógica principal
+│   ├── mailguard.py              # Código principal Python del servicio
+│   ├── mailguard.service         # Service unit para systemd
+│   └── db/
+│       └── schema.sql            # Esquema de base de datos SQL
+│
+├── docs/                         # Documentación del proyecto
+│   └── screenshots/              # Capturas de pantalla de la interfaz
+│
+├── whm-plugin/                   # Componente plugin WHM
+│   ├── assets/                   # Recursos estáticos del plugin
+│   ├── mailguard.conf            # Archivo de configuración del plugin
+│   ├── mailguard.pl              # Script Perl para el plugin WHM
+│   └── mailguard.tmpl            # Plantilla del plugin WHM
+│
 ├── install.sh                    # Script de instalación del plugin
 ├── uninstall.sh                  # Script de desinstalación del plugin
-├── README.md                     # Documentación principal (vacío)
-│
-├── backend/                      # Componente backend - Lógica principal
-│   ├── mailguard.py             # Código principal Python del servicio
-│   ├── mailguard.service        # Servicios systemd para ejecutar mailguard
-│   └── db/
-│       └── schema.sql           # Esquema de base de datos SQL
-│
-├── whm-plugin/                  # Componente frontend - Plugin WHM
-│   ├── mailguard.cgi            # Script CGI para interfaz web
-│   └── mailguard.conf           # Archivo de configuración del plugin
-│
-└── docs/                        # Documentación del proyecto
-    └── screenshots/             # Capturas de pantalla de la interfaz
+├── README.md                     # Documentación principal
+└── info.txt                      # Documentación de proyecto actualizada
 
 
 ================================================================================
 COMPONENTES PRINCIPALES:
 ================================================================================
 
-1. FRONTEND (whm-plugin/)
-   - mailguard.cgi: Interfaz web accesible desde el panel de control WHM
-   - mailguard.conf: Configuración específica del plugin
-
-2. BACKEND (backend/)
+1. BACKEND (backend/)
    - mailguard.py: Servicio principal que ejecuta la lógica de protección
    - mailguard.service: Permite que el servicio se inicie automáticamente
    - schema.sql: Define la estructura de almacenamiento de datos
 
-3. INSTALACIÓN (scripts)
+2. PLUGIN WHM (whm-plugin/)
+   - mailguard.pl: Script Perl del plugin WHM
+   - mailguard.tmpl: Plantilla de configuración o interfaz
+   - mailguard.conf: Configuración del plugin WHM
+   - assets/: Recursos adicionales del plugin
+
+3. INSTALACIÓN (raíz)
    - install.sh: Automatiza la instalación del plugin en WHM
    - uninstall.sh: Automatiza la desinstalación del plugin
 
@@ -59,12 +62,15 @@ TECNOLOGÍAS UTILIZADAS:
 
 Backend:
     - Python (mailguard.py)
-    - SQL (para base de datos)
-    - Systemd (para gestión de servicios en Linux)
+    - SQL (schema.sql)
+    - Systemd (mailguard.service)
 
-Frontend:
-    - CGI Script (para interfaz web en WHM)
-    - Bash (install/uninstall scripts)
+Plugin WHM:
+    - Perl (mailguard.pl)
+    - Plantillas (mailguard.tmpl)
+
+Scripts de soporte:
+    - Bash (install.sh, uninstall.sh)
 
 Sistema Operativo Objetivo:
     - Linux (basado en la presencia de .service y .sh)
@@ -74,36 +80,35 @@ Sistema Operativo Objetivo:
 ARCHIVOS CLAVE:
 ================================================================================
 
-install.sh                  -> Punto de entrada principal para la instalación
 backend/mailguard.py        -> Lógica central del servicio de protección
-whm-plugin/mailguard.cgi    -> Interfaz de administración en WHM
+backend/mailguard.service   -> Unidad de servicio systemd
 backend/db/schema.sql       -> Definición de estructura de datos
-whm-plugin/mailguard.conf   -> Parámetros de configuración
+whm-plugin/mailguard.pl     -> Script del plugin WHM
+whm-plugin/mailguard.conf   -> Parámetros de configuración del plugin
+install.sh                  -> Script de instalación del plugin
+uninstall.sh                -> Script de desinstalación del plugin
 
 
 ================================================================================
 PRÓXIMOS PASOS SUGERIDOS:
 ================================================================================
 
-1. Completar el archivo README.md con documentación completa
-2. Implementar el código Python en mailguard.py
-3. Implementar el esquema de base de datos en schema.sql
-4. Crear la interfaz CGI en mailguard.cgi
-5. Configurar el archivo mailguard.conf con parámetros iniciales
-6. Crear/completar los scripts de instalación y desinstalación
-7. Añadir capturas de pantalla en docs/screenshots/
+1. Revisar el contenido de README.md y completarlo con documentación real
+2. Verificar el estado de mailguard.py y completar la lógica necesaria
+3. Confirmar el esquema de base de datos en backend/db/schema.sql
+4. Ajustar el plugin WHM en whm-plugin/mailguard.pl y mailguard.tmpl
+5. Completar install.sh y uninstall.sh según los requisitos de WHM
+6. Añadir ejemplos o capturas en docs/screenshots/ si es necesario
 
 ================================================================================
 NOTAS:
 ================================================================================
 
-- Todos los archivos de código actual están vacíos
-- La estructura del proyecto sugiere una arquitectura separada entre
-  interfaz web (WHM) y lógica de backend (servicio Python)
-- Se utiliza systemd para la gestión del servicio en segundo plano
-- Se requiere una base de datos SQL para almacenar información
+- La estructura actual no contiene mailguard.cgi en ningún directorio
+- Los archivos de plugin WHM están en whm-plugin/ y no en la raíz
+- Se mantiene una separación clara entre backend, plugin WHM y scripts
 
 ================================================================================
 Fecha de creación: 02 de abril de 2026
-Última actualización: 02 de abril de 2026
+Última actualización: 06 de abril de 2026
 ================================================================================

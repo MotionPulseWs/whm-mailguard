@@ -91,7 +91,7 @@ function mgSearch() {
 
 function mgSaveConfig() {
     var params = { action: 'save_config' };    
-    ['max_attempts','window_minutes','block_minutes','notify_email','notify_on_block','max_ips_per_account'].forEach(function(k) {
+    ['max_attempts','window_minutes','block_minutes','notify_email','notify_on_block','max_ips_per_account','window_minutes_account'].forEach(function(k) {
         params[k] = document.getElementById('cfg-' + k).value;
     });
     mgApi(params, function(d) {
