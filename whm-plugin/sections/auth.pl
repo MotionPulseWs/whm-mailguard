@@ -1,29 +1,9 @@
-#!/usr/local/cpanel/3rdparty/bin/perl
 # =============================================================================
-# mailguard.pl — WHM MailGuard Plugin
+# auth.pl — WHM MailGuard: Sección de protección por fuerza bruta
 # https://github.com/MotionPulseWs/whm-mailguard
 # =============================================================================
 
-use strict;
-use warnings;
-
-use lib '/usr/local/cpanel';
-require Cpanel::Form;
-require Whostmgr::ACLS;
-require Cpanel::Template;
-
 use DBI;
-
-# ── Verificar acceso root ──
-Whostmgr::ACLS::init_acls();
-if (!Whostmgr::ACLS::hasroot()) {
-    print "Content-type: text/html\r\n\r\n";
-    print "<h1>Acceso denegado</h1>";
-    exit;
-}
-
-# ── Leer parámetros ──
-my %form = Cpanel::Form::parseform();
 
 # ── Rutas ──
 my $DB_PATH = '/usr/local/mailguard/backend/db/mailguard.db';
@@ -66,7 +46,6 @@ sub log_event {
 my $action = $form{action} || '';
 my $ip     = $form{ip}     || '';
 
-# Toggle sistema
 if ($action eq 'toggle_enabled') {
     print "Content-type: application/json\r\n\r\n";
     my $current = get_config('enabled', '1');
@@ -80,6 +59,7 @@ if ($action eq 'toggle_enabled') {
             my $blocked = $dbh->selectall_arrayref("SELECT ip FROM blocked_ips WHERE is_active=1", { Slice => {} });
             for my $row (@$blocked) {
                 system("iptables -D INPUT -s $row->{ip} -j DROP 2>/dev/null");
+                system("ip6tables -D INPUT -s $row->{ip} -j DROP 2>/dev/null");
                 $dbh->do("UPDATE blocked_ips SET is_active=0, unblocked_at=datetime('now'), unblocked_by='emergency' WHERE ip=? AND is_active=1", {}, $row->{ip});
             }
             $dbh->disconnect();
@@ -90,10 +70,10 @@ if ($action eq 'toggle_enabled') {
     exit;
 }
 
-# Desbloquear IP
 if ($action eq 'unblock' && $ip) {
     print "Content-type: application/json\r\n\r\n";
     system("iptables -D INPUT -s $ip -j DROP 2>/dev/null");
+    system("ip6tables -D INPUT -s $ip -j DROP 2>/dev/null");
     my $dbh = get_db();
     if ($dbh) {
         $dbh->do("UPDATE blocked_ips SET is_active=0, unblocked_at=datetime('now'), unblocked_by='manual' WHERE ip=? AND is_active=1", {}, $ip);
@@ -105,11 +85,11 @@ if ($action eq 'unblock' && $ip) {
     exit;
 }
 
-# Agregar a whitelist desde tabla de bloqueadas
 if ($action eq 'whitelist' && $ip) {
     print "Content-type: application/json\r\n\r\n";
     my $label = $form{label} || 'Sin etiqueta';
     system("iptables -D INPUT -s $ip -j DROP 2>/dev/null");
+    system("ip6tables -D INPUT -s $ip -j DROP 2>/dev/null");
     my $dbh = get_db();
     if ($dbh) {
         $dbh->do("INSERT OR IGNORE INTO whitelist (ip, label, added_by) VALUES (?, ?, 'manual')", {}, $ip, $label);
@@ -122,7 +102,6 @@ if ($action eq 'whitelist' && $ip) {
     exit;
 }
 
-# Agregar a whitelist manualmente
 if ($action eq 'add_whitelist' && $ip) {
     print "Content-type: application/json\r\n\r\n";
     my $label = $form{label} || 'Sin etiqueta';
@@ -136,7 +115,6 @@ if ($action eq 'add_whitelist' && $ip) {
     exit;
 }
 
-# Eliminar de whitelist
 if ($action eq 'remove_whitelist' && $ip) {
     print "Content-type: application/json\r\n\r\n";
     my $dbh = get_db();
@@ -149,7 +127,6 @@ if ($action eq 'remove_whitelist' && $ip) {
     exit;
 }
 
-# Buscar IP
 if ($action eq 'search' && $ip) {
     print "Content-type: application/json\r\n\r\n";
     my $dbh = get_db();
@@ -180,12 +157,11 @@ if ($action eq 'search' && $ip) {
     exit;
 }
 
-# Guardar configuración
 if ($action eq 'save_config') {
     print "Content-type: application/json\r\n\r\n";
     my $dbh = get_db();
     if ($dbh) {
-        for my $key (qw(max_attempts window_minutes block_minutes notify_email notify_on_block)) {
+        for my $key (qw(max_attempts window_minutes block_minutes notify_email notify_on_block max_ips_per_account window_minutes_account)) {
             $dbh->do("UPDATE config SET value=?, updated_at=datetime('now') WHERE key=?", {}, $form{$key}, $key) if $form{$key};
         }
         $dbh->disconnect();
@@ -222,8 +198,8 @@ my $switch_color = $enabled eq '1' ? '#22c55e' : '#ef4444';
 my $switch_label = $enabled eq '1' ? 'ACTIVO'  : 'INACTIVO';
 my $switch_icon  = $enabled eq '1' ? '🟢'      : '🔴';
 my $status_text  = $enabled eq '1'
-    ? 'El sistema está protegiendo tu servidor'
-    : '⚠️ MODO PASIVO — El servidor no está protegido';
+    ? 'El sistema esta protegiendo tu servidor'
+    : 'MODO PASIVO - El servidor no esta protegido';
 
 # ── Construir filas HTML ──
 my $rows_blocked = '';
@@ -258,20 +234,22 @@ for my $r (@whitelist) {
     $rows_whitelist .= "<tr><td><span class=\"mg-ip\">$rip</span></td><td>$rlbl</td><td>$rdat</td><td><button class=\"mg-btn mg-btn-sm mg-btn-danger\" onclick=\"mgRemoveWhitelist('$rip')\">Eliminar</button></td></tr>\n";
 }
 
-my $cfg_max      = get_config('max_attempts',    '10');
-my $cfg_window   = get_config('window_minutes',  '10');
-my $cfg_block    = get_config('block_minutes',   '60');
-my $cfg_email    = get_config('notify_email',    'monitor@motionpulse.net');
-my $cfg_notify   = get_config('notify_on_block', '1');
+my $cfg_max      = get_config('max_attempts',          '10');
+my $cfg_window   = get_config('window_minutes',        '10');
+my $cfg_block    = get_config('block_minutes',         '60');
+my $cfg_email    = get_config('notify_email',          'monitor@motionpulse.net');
+my $cfg_notify   = get_config('notify_on_block',       '1');
+my $cfg_max_ips  = get_config('max_ips_per_account',   '5');
+my $cfg_win_acc  = get_config('window_minutes_account','60');
 
 # ── Generar HTML ──
-my $html_output;
-open my $OUT, '>', \$html_output;
-select $OUT;
-
-print <<HTML;
+my $html = <<HTML;
 <style>
 *{box-sizing:border-box}
+.mg-nav{display:flex;gap:8px;margin-bottom:24px}
+.mg-nav-btn{padding:10px 24px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;border:2px solid #1a6fc4;background:#fff;color:#1a6fc4;text-decoration:none;transition:all .2s}
+.mg-nav-btn.active{background:#1a6fc4;color:#fff}
+.mg-nav-btn:hover{opacity:.85}
 .mg-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
 .mg-stat{background:#fff;border:1px solid #d1d5da;border-radius:8px;padding:16px 20px;border-left:4px solid #1a6fc4}
 .mg-stat.mg-red{border-left-color:#cb2431}
@@ -315,6 +293,13 @@ tr:hover td{background:#f6f8fa}
 .mg-toast.error{background:#cb2431}
 </style>
 
+<!-- Navegación principal -->
+<div class="mg-nav">
+    <a href="index.cgi?section=auth" class="mg-nav-btn active">🔐 Inicios de sesion</a>
+    <a href="index.cgi?section=mail" class="mg-nav-btn">📧 Proteccion de correos</a>
+</div>
+
+<!-- Switch de emergencia -->
 <div class="mg-emergency">
     <div>
         <h2>$switch_icon Estado: <strong>$switch_label</strong></h2>
@@ -323,6 +308,7 @@ tr:hover td{background:#f6f8fa}
     <button class="mg-switch-btn" id="mg-switch-btn">$switch_icon $switch_label</button>
 </div>
 
+<!-- Stats -->
 <div class="mg-grid">
     <div class="mg-stat mg-red"><div class="mg-stat-val">$active_blocks</div><div class="mg-stat-lbl">IPs bloqueadas ahora</div></div>
     <div class="mg-stat mg-yellow"><div class="mg-stat-val">$blocks_today</div><div class="mg-stat-lbl">Bloqueadas hoy</div></div>
@@ -330,18 +316,20 @@ tr:hover td{background:#f6f8fa}
     <div class="mg-stat mg-green"><div class="mg-stat-val">$total_wl</div><div class="mg-stat-lbl">IPs en whitelist</div></div>
 </div>
 
+<!-- Tabs -->
 <div class="mg-tabs">
     <button class="mg-tab active" onclick="mgTab('blocked',this)">🔴 Bloqueadas</button>
     <button class="mg-tab" onclick="mgTab('search',this)">🔍 Buscar IP</button>
     <button class="mg-tab" onclick="mgTab('history',this)">📋 Historial</button>
     <button class="mg-tab" onclick="mgTab('whitelist',this)">✅ Whitelist</button>
-    <button class="mg-tab" onclick="mgTab('config',this)">⚙️ Configuración</button>
+    <button class="mg-tab" onclick="mgTab('config',this)">⚙️ Configuracion</button>
 </div>
 
 <div style="text-align:right;margin-bottom:12px">
-    <button class="mg-btn mg-btn-blue" onclick="mgReload()">↻ Recargar</button>
+    <button class="mg-btn mg-btn-blue" id="mg-reload-btn">↻ Recargar</button>
 </div>
 
+<!-- Panel: Bloqueadas -->
 <div id="mg-panel-blocked" class="mg-panel active">
     <div class="mg-table-wrap">
         <table>
@@ -351,14 +339,16 @@ tr:hover td{background:#f6f8fa}
     </div>
 </div>
 
+<!-- Panel: Buscar -->
 <div id="mg-panel-search" class="mg-panel">
     <div class="mg-search">
         <input type="text" id="mg-search-input" placeholder="IP o parte de ella (ej: 192.168.1)" />
-        <button class="mg-btn mg-btn-blue" onclick="mgSearch()">🔍 Buscar</button>
+        <button class="mg-btn mg-btn-blue" id="mg-search-btn">🔍 Buscar</button>
     </div>
     <div id="mg-search-result"></div>
 </div>
 
+<!-- Panel: Historial -->
 <div id="mg-panel-history" class="mg-panel">
     <div class="mg-table-wrap">
         <table>
@@ -368,11 +358,12 @@ tr:hover td{background:#f6f8fa}
     </div>
 </div>
 
+<!-- Panel: Whitelist -->
 <div id="mg-panel-whitelist" class="mg-panel">
     <div class="mg-search">
         <input type="text" id="mg-wl-ip" placeholder="IP (ej: 179.6.164.138)" />
         <input type="text" id="mg-wl-label" placeholder="Etiqueta (ej: Cliente Juan)" style="max-width:220px" />
-        <button class="mg-btn mg-btn-success" onclick="mgAddWhitelist()">✅ Agregar</button>
+        <button class="mg-btn mg-btn-success" id="mg-wl-add-btn">✅ Agregar</button>
     </div>
     <div class="mg-table-wrap">
         <table>
@@ -382,41 +373,28 @@ tr:hover td{background:#f6f8fa}
     </div>
 </div>
 
+<!-- Panel: Configuracion -->
 <div id="mg-panel-config" class="mg-panel">
     <div class="mg-table-wrap" style="padding:24px">
         <div class="mg-config-grid">
             <div>
-                <div class="mg-form-group"><label>Máximo de intentos antes de bloquear</label><input type="number" id="cfg-max_attempts" value="$cfg_max" min="3" max="50" /></div>
-                <div class="mg-form-group"><label>Ventana de tiempo (minutos)</label><input type="number" id="cfg-window_minutes" value="$cfg_window" min="1" max="60" /></div>
-                <div class="mg-form-group"><label>Duración del bloqueo (minutos)</label><input type="number" id="cfg-block_minutes" value="$cfg_block" min="5" max="1440" /></div>
+                <div class="mg-form-group"><label>Maximo de intentos antes de bloquear</label><input type="number" id="cfg-max_attempts" value="$cfg_max" min="3" max="50" /></div>
+                <div class="mg-form-group"><label>Ventana de tiempo por IP (minutos)</label><input type="number" id="cfg-window_minutes" value="$cfg_window" min="1" max="60" /></div>
+                <div class="mg-form-group"><label>Duracion del bloqueo (minutos)</label><input type="number" id="cfg-block_minutes" value="$cfg_block" min="5" max="1440" /></div>
+                <div class="mg-form-group"><label>Max IPs distintas por cuenta antes de bloquear</label><input type="number" id="cfg-max_ips_per_account" value="$cfg_max_ips" min="2" max="20" /></div>
             </div>
             <div>
                 <div class="mg-form-group"><label>Email de notificaciones</label><input type="email" id="cfg-notify_email" value="$cfg_email" /></div>
-                <div class="mg-form-group"><label>Notificar al bloquear (1=sí, 0=no)</label><input type="number" id="cfg-notify_on_block" value="$cfg_notify" min="0" max="1" /></div>
+                <div class="mg-form-group"><label>Notificar al bloquear (1=si, 0=no)</label><input type="number" id="cfg-notify_on_block" value="$cfg_notify" min="0" max="1" /></div>
+                <div class="mg-form-group"><label>Ventana de tiempo para ataque distribuido (minutos)</label><input type="number" id="cfg-window_minutes_account" value="$cfg_win_acc" min="10" max="1440" /></div>
             </div>
-            <div>
-                <div class="mg-form-group"><label>Max IPs distintas por cuenta antes de bloquear</label><input type="number" id="cfg-max_ips_per_account" value="5" min="2" max="20" /></div>
-                <div class="mg-form-group"><label>Ventana de tiempo para ataque distribuido (minutos)</label><input type="number" id="cfg-window_minutes_account" value="60" min="10" max="1440" /></div>
-            </div>      
         </div>
-        <button class="mg-btn mg-btn-blue" onclick="mgSaveConfig()">💾 Guardar</button>
+        <button class="mg-btn mg-btn-blue" id="mg-save-config-btn">💾 Guardar</button>
     </div>
 </div>
 
 <div class="mg-toast" id="mg-toast"></div>
-
 <script src="assets/mailguard.js"></script>
-
 HTML
 
-select STDOUT;
-
-# ── Procesar con template WHM ──
-print "Content-type: text/html\r\n\r\n";
-Cpanel::Template::process_template(
-    'whostmgr',
-    {
-        'template_file'    => 'mailguard.tmpl',
-        'mailguard_output' => $html_output,
-    }
-);
+return $html;

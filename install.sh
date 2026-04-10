@@ -14,7 +14,7 @@ NC='\033[0m'
 # ─── Variables ────────────────────────────────────────────────────────────────
 INSTALL_DIR='/usr/local/mailguard'
 SERVICE_NAME='mailguard'
-WHM_CGI_DIR='/usr/local/cpanel/whostmgr/docroot/cgi'
+WHM_CGI_DIR='/usr/local/cpanel/whostmgr/docroot/cgi/mailguard'
 WHM_TMPL_DIR='/usr/local/cpanel/whostmgr/docroot/templates'
 LOG_FILE='/var/log/mailguard.log'
 
@@ -27,30 +27,26 @@ error()   { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 # ─── Verificaciones previas ───────────────────────────────────────────────────
 check_requirements() {
     info "Verificando requisitos..."
-    [ "$EUID" -ne 0 ]                          && error "Debe ejecutarse como root"
-    command -v python3 &>/dev/null             || error "Python3 no está instalado"
-    python3 -c "import sqlite3, subprocess, re" 2>/dev/null || error "Módulos Python requeridos no disponibles"
-    command -v iptables &>/dev/null            || error "iptables no está instalado"
-    [ -f /var/log/exim_mainlog ]               || error "No se encontró /var/log/exim_mainlog"
-    [ -d /usr/local/cpanel ]                   || warning "cPanel no detectado — el plugin WHM no se instalará"
+    [ "$EUID" -ne 0 ]                           && error "Debe ejecutarse como root"
+    command -v python3 &>/dev/null              || error "Python3 no esta instalado"
+    python3 -c "import sqlite3, subprocess, re" 2>/dev/null || error "Modulos Python requeridos no disponibles"
+    command -v iptables &>/dev/null             || error "iptables no esta instalado"
+    [ -f /var/log/exim_mainlog ]                || error "No se encontro /var/log/exim_mainlog"
+    [ -d /usr/local/cpanel ]                    || warning "cPanel no detectado - el plugin WHM no se instalara"
     success "Requisitos verificados"
 }
 
-# ─── Instalación de archivos backend ─────────────────────────────────────────
+# ─── Instalación backend ──────────────────────────────────────────────────────
 install_backend() {
     info "Instalando backend en $INSTALL_DIR..."
 
     mkdir -p "$INSTALL_DIR/backend/db"
-    mkdir -p "$INSTALL_DIR/whm-plugin/assets"
 
-    # Solo copiar si no estamos en el mismo directorio
     if [ "$(pwd)" != "$INSTALL_DIR" ]; then
-        cp -r backend/  "$INSTALL_DIR/"
-        cp -r whm-plugin/ "$INSTALL_DIR/"
+        cp -r backend/ "$INSTALL_DIR/"
     fi
 
     chmod +x "$INSTALL_DIR/backend/mailguard.py"
-
     touch "$LOG_FILE"
     chmod 640 "$LOG_FILE"
 
@@ -99,7 +95,7 @@ conn.close()
 # ─── IP del administrador ─────────────────────────────────────────────────────
 add_admin_ip() {
     echo ""
-    echo -e "${YELLOW}¿Cuál es tu IP fija de administración?${NC} (Enter para omitir)"
+    echo -e "${YELLOW}Cual es tu IP fija de administracion?${NC} (Enter para omitir)"
     read -r -p "IP: " ADMIN_IP
 
     if [ -n "$ADMIN_IP" ]; then
@@ -132,43 +128,63 @@ install_service() {
     fi
 }
 
+# ─── Archivos de Exim ────────────────────────────────────────────────────────
+setup_exim_files() {
+    info "Verificando archivos de blacklist de Exim..."
+
+    [ -f /etc/blocked_incoming_email_domains ] || touch /etc/blocked_incoming_email_domains
+    [ -f /etc/spammeripblocks ]                || touch /etc/spammeripblocks
+
+    success "Archivos de Exim listos"
+}
+
 # ─── Plugin WHM ───────────────────────────────────────────────────────────────
 install_whm_plugin() {
     if [ ! -d /usr/local/cpanel ]; then
-        warning "cPanel no encontrado — saltando instalación del plugin WHM"
+        warning "cPanel no encontrado - saltando instalacion del plugin WHM"
         return
     fi
 
     info "Instalando plugin WHM..."
 
-    mkdir -p "$WHM_CGI_DIR/mailguard/assets"
+    # Crear estructura de directorios
+    mkdir -p "$WHM_CGI_DIR/sections"
+    mkdir -p "$WHM_CGI_DIR/assets"
 
-    cp "$INSTALL_DIR/whm-plugin/mailguard.pl" "$WHM_CGI_DIR/mailguard/index.cgi"
-    chmod 755 "$WHM_CGI_DIR/mailguard/index.cgi"
+    # Copiar archivos principales
+    cp "$INSTALL_DIR/whm-plugin/index.cgi"              "$WHM_CGI_DIR/index.cgi"
+    cp "$INSTALL_DIR/whm-plugin/sections/auth.pl"       "$WHM_CGI_DIR/sections/auth.pl"
+    cp "$INSTALL_DIR/whm-plugin/sections/mail.pl"       "$WHM_CGI_DIR/sections/mail.pl"
+    cp "$INSTALL_DIR/whm-plugin/assets/mailguard.js"    "$WHM_CGI_DIR/assets/mailguard.js"
+    cp "$INSTALL_DIR/whm-plugin/assets/blacklist.js"    "$WHM_CGI_DIR/assets/blacklist.js"
+    cp "$INSTALL_DIR/whm-plugin/mailguard.tmpl"         "$WHM_TMPL_DIR/mailguard.tmpl"
 
-    cp "$INSTALL_DIR/whm-plugin/assets/mailguard.js" "$WHM_CGI_DIR/mailguard/assets/"
-    chmod 644 "$WHM_CGI_DIR/mailguard/assets/mailguard.js"
-
-    cp "$INSTALL_DIR/whm-plugin/mailguard.tmpl" "$WHM_TMPL_DIR/"
+    # Permisos
+    chmod 755 "$WHM_CGI_DIR/index.cgi"
+    chmod 644 "$WHM_CGI_DIR/sections/auth.pl"
+    chmod 644 "$WHM_CGI_DIR/sections/mail.pl"
+    chmod 644 "$WHM_CGI_DIR/assets/mailguard.js"
+    chmod 644 "$WHM_CGI_DIR/assets/blacklist.js"
     chmod 644 "$WHM_TMPL_DIR/mailguard.tmpl"
 
+    # Registrar en WHM
     cp "$INSTALL_DIR/whm-plugin/mailguard.conf" /var/cpanel/apps/
     /usr/local/cpanel/bin/register_appconfig /var/cpanel/apps/mailguard.conf
 
     success "Plugin WHM instalado"
-    echo -e "  Accede en: ${BLUE}WHM → Plugins → MailGuard${NC}"
+    echo -e "  Accede en: ${BLUE}WHM -> Plugins -> MailGuard${NC}"
 }
 
 # ─── Resumen ──────────────────────────────────────────────────────────────────
 show_summary() {
     echo ""
     echo -e "${GREEN}╔══════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║     WHM MailGuard instalado con éxito    ║${NC}"
+    echo -e "${GREEN}║     WHM MailGuard instalado con exito    ║${NC}"
     echo -e "${GREEN}╚══════════════════════════════════════════╝${NC}"
     echo ""
     echo -e "  Servicio:  ${BLUE}systemctl status mailguard${NC}"
     echo -e "  Log:       ${BLUE}tail -f /var/log/mailguard.log${NC}"
-    echo -e "  Plugin:    ${BLUE}https://TU_IP:2087/cgi/mailguard.pl${NC}"
+    echo -e "  Plugin:    ${BLUE}WHM -> Plugins -> MailGuard${NC}"
     echo ""
 }
 
@@ -186,6 +202,7 @@ main() {
     setup_whitelist
     add_admin_ip
     install_service
+    setup_exim_files
     install_whm_plugin
     show_summary
 }
