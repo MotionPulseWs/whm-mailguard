@@ -14,8 +14,8 @@ NC='\033[0m'
 # ─── Variables ────────────────────────────────────────────────────────────────
 INSTALL_DIR='/usr/local/mailguard'
 SERVICE_NAME='mailguard'
-WHM_PLUGIN_DIR='/usr/local/cpanel/whostmgr/docroot/cgi'
-WHM_ADDON_DIR='/usr/local/cpanel/whostmgr/addonfeatures'
+WHM_CGI_DIR='/usr/local/cpanel/whostmgr/docroot/cgi/mailguard'
+WHM_TMPL_DIR='/usr/local/cpanel/whostmgr/docroot/templates'
 LOG_FILE='/var/log/mailguard.log'
 
 # ─── Funciones ────────────────────────────────────────────────────────────────
@@ -28,15 +28,15 @@ error()   { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 confirm() {
     echo ""
     echo -e "${RED}╔══════════════════════════════════════════════╗${NC}"
-    echo -e "${RED}║     ¿Deseas desinstalar WHM MailGuard?       ║${NC}"
-    echo -e "${RED}║  Esto eliminará todos los datos e historial  ║${NC}"
+    echo -e "${RED}║     Desinstalar WHM MailGuard?               ║${NC}"
+    echo -e "${RED}║  Esto eliminara todos los datos e historial  ║${NC}"
     echo -e "${RED}╚══════════════════════════════════════════════╝${NC}"
     echo ""
     read -r -p "Escribe 'SI' para confirmar: " CONFIRM
     [ "$CONFIRM" = "SI" ] || { echo "Cancelado."; exit 0; }
 }
 
-# ─── Detener y eliminar servicio ──────────────────────────────────────────────
+# ─── Detener servicio ─────────────────────────────────────────────────────────
 remove_service() {
     info "Deteniendo servicio..."
 
@@ -56,7 +56,7 @@ remove_service() {
     success "Servicio eliminado"
 }
 
-# ─── Limpiar reglas de iptables ───────────────────────────────────────────────
+# ─── Limpiar iptables ─────────────────────────────────────────────────────────
 cleanup_iptables() {
     info "Liberando IPs bloqueadas por MailGuard..."
 
@@ -73,15 +73,15 @@ for row in rows:
         COUNT=0
         while IFS= read -r ip; do
             [ -z "$ip" ] && continue
-            iptables -D INPUT -s "$ip" -j DROP 2>/dev/null && COUNT=$((COUNT+1))
+            iptables  -D INPUT -s "$ip" -j DROP 2>/dev/null && COUNT=$((COUNT+1))
+            ip6tables -D INPUT -s "$ip" -j DROP 2>/dev/null
         done <<< "$BLOCKED_IPS"
 
         success "$COUNT IPs desbloqueadas"
     else
-        warning "Base de datos no encontrada — omitiendo limpieza de iptables"
+        warning "Base de datos no encontrada - omitiendo limpieza de iptables"
     fi
 
-    # Guardar cambios
     iptables-save > /etc/sysconfig/iptables 2>/dev/null || true
 }
 
@@ -89,8 +89,14 @@ for row in rows:
 remove_whm_plugin() {
     info "Eliminando plugin WHM..."
 
-    rm -f "$WHM_PLUGIN_DIR/mailguard.cgi"
-    rm -f "$WHM_ADDON_DIR/mailguard.conf"
+    # Eliminar directorio completo del plugin
+    rm -rf "$WHM_CGI_DIR"
+
+    # Eliminar template
+    rm -f "$WHM_TMPL_DIR/mailguard.tmpl"
+
+    # Desregistrar de WHM
+    rm -f "/var/cpanel/apps/mailguard.conf"
 
     success "Plugin WHM eliminado"
 }
@@ -98,7 +104,7 @@ remove_whm_plugin() {
 # ─── Opción de conservar logs ─────────────────────────────────────────────────
 handle_logs() {
     echo ""
-    echo -e "${YELLOW}¿Deseas conservar el historial de logs?${NC}"
+    echo -e "${YELLOW}Deseas conservar el historial de logs?${NC}"
     read -r -p "  (s/n): " KEEP_LOGS
 
     if [[ "$KEEP_LOGS" =~ ^[Ss]$ ]]; then
@@ -112,7 +118,7 @@ handle_logs() {
 
 # ─── Eliminar archivos ────────────────────────────────────────────────────────
 remove_files() {
-    info "Eliminando archivos de instalación..."
+    info "Eliminando archivos de instalacion..."
 
     rm -rf "$INSTALL_DIR"
     rm -f  "$LOG_FILE"
@@ -120,28 +126,25 @@ remove_files() {
     success "Archivos eliminados"
 }
 
-# ─── Resumen final ────────────────────────────────────────────────────────────
+# ─── Resumen ──────────────────────────────────────────────────────────────────
 show_summary() {
     echo ""
     echo -e "${GREEN}╔══════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║    WHM MailGuard desinstalado con éxito  ║${NC}"
+    echo -e "${GREEN}║   WHM MailGuard desinstalado con exito   ║${NC}"
     echo -e "${GREEN}╚══════════════════════════════════════════╝${NC}"
     echo ""
     echo -e "  Todas las IPs bloqueadas han sido liberadas."
-    echo -e "  El servidor queda sin protección activa."
-    echo ""
-    echo -e "  Para reinstalar:"
-    echo -e "    ${BLUE}bash install.sh${NC}"
+    echo -e "  Para reinstalar: ${BLUE}bash install.sh${NC}"
     echo ""
 }
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 main() {
-    [ "$EUID" -ne 0 ] && { echo "Debe ejecutarse como root"; exit 1; }
+    [ "$EUID" -ne 0 ] && error "Debe ejecutarse como root"
 
     echo ""
     echo -e "${RED}╔══════════════════════════════════════════╗${NC}"
-    echo -e "${RED}║        WHM MailGuard Uninstaller         ║${NC}"
+    echo -e "${RED}║        WHM MailGuard Uninstaller         ║NC}"
     echo -e "${RED}╚══════════════════════════════════════════╝${NC}"
 
     confirm
