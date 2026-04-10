@@ -21,18 +21,30 @@ if (!Whostmgr::ACLS::hasroot()) {
 }
 
 # ── Leer parámetros ──
-my %form = Cpanel::Form::parseform();
+our %form = Cpanel::Form::parseform();
 
 # ── Determinar sección activa ──
 my $section = $form{section} || 'auth';
 $section = 'auth' unless $section =~ /^(auth|mail)$/;
 
+# ── Detectar si es petición AJAX ──
+my $is_ajax = $form{action} ? 1 : 0;
+
 # ── Rutas ──
 my $SECTIONS_DIR = '/usr/local/cpanel/whostmgr/docroot/cgi/mailguard/sections';
 
-# ── Cargar sección correspondiente ──
-my $html_output = '';
+# ── Si es AJAX ejecutar sección directamente ──
+if ($is_ajax) {
+    if ($section eq 'auth') {
+        do "$SECTIONS_DIR/auth.pl";
+    } elsif ($section eq 'mail') {
+        do "$SECTIONS_DIR/mail.pl";
+    }
+    exit;
+}
 
+# ── Si es página normal cargar HTML ──
+my $html_output = '';
 if ($section eq 'auth') {
     $html_output = do "$SECTIONS_DIR/auth.pl"
         or die "No se pudo cargar auth.pl: $!";
