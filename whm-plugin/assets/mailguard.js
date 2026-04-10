@@ -101,9 +101,19 @@ function mgSaveConfig() {
 
 function mgBindAll() {
     var switchBtn = document.getElementById('mg-switch-btn');
-    if (switchBtn) {
-        switchBtn.onclick = mgToggle;
-    }
+    if (switchBtn) switchBtn.onclick = mgToggle;
+
+    var reloadBtn = document.getElementById('mg-reload-btn');
+    if (reloadBtn) reloadBtn.onclick = mgReload;
+
+    var searchBtn = document.getElementById('mg-search-btn');
+    if (searchBtn) searchBtn.onclick = mgSearch;
+
+    var wlAddBtn = document.getElementById('mg-wl-add-btn');
+    if (wlAddBtn) wlAddBtn.onclick = mgAddWhitelist;
+
+    var saveConfigBtn = document.getElementById('mg-save-config-btn');
+    if (saveConfigBtn) saveConfigBtn.onclick = mgSaveConfig;
 }
 
 if (document.readyState === 'loading') {
