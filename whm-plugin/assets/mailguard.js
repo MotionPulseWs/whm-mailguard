@@ -1,4 +1,4 @@
-var MG_URL = window.location.href.split('?')[0];
+var MG_URL = window.location.href.split('?')[0] + '?section=auth';
 
 function mgTab(name, el) {
     document.querySelectorAll('.mg-panel').forEach(function(p){ p.classList.remove('active'); });
