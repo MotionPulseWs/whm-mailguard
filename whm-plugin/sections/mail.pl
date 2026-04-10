@@ -91,6 +91,28 @@ if ($action eq 'bl_analyze') {
     my @blocked_ips     = read_file_lines($IPS_FILE);
     my %already_blocked = map { $_ => 1 } (@blocked_domains, @blocked_ips);
 
+    # ── Proveedores legítimos conocidos ──────────────────────────────────────
+    my %legit_providers = map { $_ => 1 } qw(
+        gmail.com google.com googlemail.com
+        outlook.com hotmail.com live.com microsoft.com
+        yahoo.com ymail.com
+        amazonses.com amazon.com amazonaws.com
+        sendgrid.net sendgrid.com
+        mailchimp.com mandrillapp.com
+        protection.outlook.com prod.outlook.com
+        smtp.gmail.com
+        icloud.com me.com mac.com
+        protonmail.com proton.me
+        zoho.com
+    );
+
+    # ── Dominios propios del servidor ────────────────────────────────────────
+    my %own_domains = map { $_ => 1 } qw(
+        localhost localdomain localhost.localdomain
+        server.motionpulse.company motionpulse.company
+        motionpulse.net motionpulse.xyz motionpulse.online
+    );
+
     my %domain_count;
     my %ip_count;
 
@@ -100,32 +122,54 @@ if ($action eq 'bl_analyze') {
     };
 
     while (my $line = <$log>) {
-        # Detectar dominios sospechosos por SPF fail
-        if ($line =~ /SPF.*fail/i && $line =~ /H=\S*\s+\[(\d+\.\d+\.\d+\.\d+)\]/) {
-            my $ip = $1;
-            $ip_count{$ip}++ unless $already_blocked{$ip};
+        next unless $line =~ /H=\(([^)]+)\)\s+\[([^\]]+)\]/;
+        my $helo = lc($1);
+        my $ip   = $2;
+
+        # ── Detectar IPs sospechosas ──────────────────────────────────────
+        # Si el HELO es una IP entre corchetes o el hostname es solo una IP
+        if ($ip =~ /^\d+\.\d+\.\d+\.\d+$/ || $ip =~ /^[0-9a-fA-F:]+$/) {
+            # Es sospechoso si el HELO es igual a la IP o no tiene dominio
+            if ($helo =~ /^\[?\d+\.\d+\.\d+\.\d+\]?$/ || $helo !~ /\./) {
+                next if $already_blocked{$ip};
+                next if $ip eq '127.0.0.1' || $ip eq '0.0.0.0';
+                $ip_count{$ip}++;
+                next;
+            }
         }
-        # Detectar dominios con muchos envios
-        if ($line =~ /<=.*H=\(([^)]+)\)/) {
-            my $domain = lc($1);
-            $domain =~ s/^www\.//;
-            $domain_count{$domain}++ unless $already_blocked{$domain};
-        }
+
+        # ── Detectar dominios sospechosos ─────────────────────────────────
+        # Extraer dominio base del HELO
+        my $domain = $helo;
+        $domain =~ s/^\[|\]$//g;  # quitar corchetes si los hay
+        $domain =~ s/^[^.]+\.//;  # quitar subdominio para obtener dominio base
+
+        # Filtrar legítimos y propios
+        next if $already_blocked{$helo};
+        next if $legit_providers{$domain} || $legit_providers{$helo};
+        next if $own_domains{$helo} || $own_domains{$domain};
+        next if $helo =~ /outlook\.com$|gmail\.com$|google\.com$|amazonaws\.com$|protection\.outlook\.com$/;
+
+        $domain_count{$helo}++;
     }
     close($log);
 
-    # Top 10 dominios sospechosos
-    my @top_domains = sort { $domain_count{$b} <=> $domain_count{$a} } keys %domain_count;
-    @top_domains = @top_domains[0..9] if @top_domains > 10;
+    # ── Top 10 de cada tipo ───────────────────────────────────────────────
+    my @top_domains = (sort { $domain_count{$b} <=> $domain_count{$a} } keys %domain_count)[0..9];
+    my @top_ips     = (sort { $ip_count{$b}     <=> $ip_count{$a}     } keys %ip_count)[0..9];
 
-    # Top 10 IPs sospechosas
-    my @top_ips = sort { $ip_count{$b} <=> $ip_count{$a} } keys %ip_count;
-    @top_ips = @top_ips[0..9] if @top_ips > 10;
+    @top_domains = grep { defined } @top_domains;
+    @top_ips     = grep { defined } @top_ips;
 
-    my @domain_results = map { "{\"entry\":\"$_\",\"count\":$domain_count{$_},\"type\":\"domain\"}" } @top_domains;
-    my @ip_results     = map { "{\"entry\":\"$_\",\"count\":$ip_count{$_},\"type\":\"ip\"}" } @top_ips;
+    my @results;
+    for my $d (@top_domains) {
+        push @results, "{\"entry\":\"$d\",\"count\":$domain_count{$d},\"type\":\"domain\"}";
+    }
+    for my $ip (@top_ips) {
+        push @results, "{\"entry\":\"$ip\",\"count\":$ip_count{$ip},\"type\":\"ip\"}";
+    }
 
-    my $json = '[' . join(',', @domain_results, @ip_results) . ']';
+    my $json = '[' . join(',', @results) . ']';
     print "{\"success\":1,\"suggestions\":$json}";
     exit;
 }
