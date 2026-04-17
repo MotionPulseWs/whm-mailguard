@@ -239,6 +239,14 @@ if ($action eq 'bl_analyze') {
         $domain =~ s/^\[|\]$//g;
         $domain =~ s/^[^.]+\.//;
 
+        # Filtrar HELOs que son IPs privadas disfrazadas como dominio
+        # Ej: [ipv6:::ffff:192.168.0.108] o [192.168.1.1]
+        if ($helo =~ /::ffff:(\d+\.\d+\.\d+\.\d+)/i) {
+            next if is_private_ip($1);
+        }
+        next if $helo =~ /^\[(\d+\.\d+\.\d+\.\d+)\]$/ && is_private_ip($1);
+        next if $helo =~ /^\[?ipv6:/i;
+
         next if $already_blocked{$helo};
         next if $whitelisted{$helo};
         next if $legit_providers{$domain} || $legit_providers{$helo};

@@ -32,7 +32,6 @@ success "Repositorio actualizado"
 
 # ─── Backend ──────────────────────────────────────────────────────────────────
 info "Actualizando backend..."
-cp "$INSTALL_DIR/backend/mailguard.py" "$INSTALL_DIR/backend/mailguard.py"
 chmod +x "$INSTALL_DIR/backend/mailguard.py"
 success "Backend actualizado"
 
