@@ -178,7 +178,7 @@ my (@blocked_ips, @history, @whitelist);
 if ($dbh) {
     $enabled       = get_config('enabled', '1');
     $active_blocks = $dbh->selectrow_array("SELECT COUNT(*) FROM blocked_ips WHERE is_active=1") // 0;
-    $blocks_today  = $dbh->selectrow_array("SELECT COUNT(*) FROM blocked_ips WHERE date(blocked_at)=date('now')") // 0;
+    $blocks_today = $dbh->selectrow_array("SELECT COUNT(*) FROM blocked_ips WHERE date(blocked_at,'localtime')=date('now','localtime')") // 0;
     $total_blocks  = $dbh->selectrow_array("SELECT COUNT(*) FROM blocked_ips") // 0;
     $total_wl      = $dbh->selectrow_array("SELECT COUNT(*) FROM whitelist") // 0;
 
